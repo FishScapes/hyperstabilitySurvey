@@ -493,34 +493,176 @@ cpueCheck_WDNR=cpueCheck_WDNR[!is.na(cpueCheck_WDNR$Density),]
 cpueCheck_WDNR=cpueCheck_WDNR[!is.na(cpueCheck_WDNR$meanEF_CPEkm),] #159 obs
 cpueCheck_WDNR$wbicFactor=as.factor(cpueCheck_WDNR$WBIC)
 
-Wdensity=tapply(cpueCheck_WDNR$Density,cpueCheck_WDNR$WBIC,FUN=mean)
-Wshoredensity=tapply(cpueCheck_WDNR$densityShoreline,cpueCheck_WDNR$WBIC,FUN=mean)
-WefCPUE=tapply(cpueCheck_WDNR$meanEF_CPEkm,cpueCheck_WDNR$WBIC,FUN=mean)
-
-densityFit=lm(WefCPUE~Wdensity)
-shoreDensityFit=lm(WefCPUE~Wshoredensity)
+# convert to fish /km2
+cpueCheck_WDNR$Density=cpueCheck_WDNR$Density/0.00404686
+densityFit<-lmer(meanEF_CPEkm~Density+(1|wbicFactor),data=cpueCheck_WDNR)
+shoreDensityFit<-lmer(meanEF_CPEkm~densityShoreline+(1|wbicFactor),data=cpueCheck_WDNR)
 
 summary(densityFit)
 summary(shoreDensityFit)
 
-plot(Wdensity,WefCPUE)
-abline(densityFit,lwd=2)
-plot(Wshoredensity,WefCPUE)
-abline(shoreDensityFit,lwd=2)
+plot(cpueCheck_WDNR$Density,cpueCheck_WDNR$meanEF_CPEkm,col='darkgrey',pch=16)
+abline(a=mean(coefficients(densityFit)$wbicFactor[,1]),b=mean(coefficients(densityFit)$wbicFactor[,2]),lwd=2)
+plot(cpueCheck_WDNR$densityShoreline,cpueCheck_WDNR$meanEF_CPEkm,col='darkgrey',pch=16)
+abline(a=mean(coefficients(shoreDensityFit)$wbicFactor[,1]),b=mean(coefficients(shoreDensityFit)$wbicFactor[,2]),lwd=2)
 
+nullWalleye=lmer(meanEF_CPEkm~(1|wbicFactor),data=cpueCheck_WDNR)
+
+anova(densityFit,nullWalleye)
+anova(shoreDensityFit,nullWalleye)
+
+cor(cpueCheck_WDNR$meanEF_CPEkm,cpueCheck_WDNR$Density)
+cor(cpueCheck_WDNR$meanEF_CPEkm,cpueCheck_WDNR$densityShoreline)
 
 ##### bass
 bassPEfinal=read.csv("cleanedMFEbassPE.csv")
 
-plot(bassPEfinal$densityShoreline~bassPEfinal$efCPE)
+plot(bassPEfinal$densityShoreline,bassPEfinal$efCPE,col='darkgrey',pch=16)
 
-bassEFvPEfitShoreline=lm(bassPEfinal$densityShoreline~bassPEfinal$efCPE)
+bassEFvPEfitShoreline=lm(bassPEfinal$efCPE~bassPEfinal$densityShoreline)
 summary(bassEFvPEfitShoreline)
 abline(bassEFvPEfitShoreline,lwd=2)
 
+plot(bassPEfinal$densityAreal,bassPEfinal$efCPE,col='darkgrey',pch=16)
 
-plot(bassPEfinal$densityAreal~bassPEfinal$efCPE)
-
-bassEFvPEfitAreal=lm(bassPEfinal$densityAreal~bassPEfinal$efCPE)
+bassEFvPEfitAreal=lm(bassPEfinal$efCPE~bassPEfinal$densityAreal)
 summary(bassEFvPEfitAreal)
 abline(bassEFvPEfitAreal,lwd=2)
+
+cor(bassPEfinal$efCPE,bassPEfinal$densityShoreline)
+cor(bassPEfinal$efCPE,bassPEfinal$densityAreal)
+
+
+
+#### generating lake-year table for data availability
+WBICs=sort(unique(BWPJoin$WBIC))
+years=sort(unique(BWPJoin$surveyYear))
+
+whatWeHave=paste(BWPJoin$WBIC,BWPJoin$surveyYear,sep="_")
+
+sampTable=matrix(0,length(WBICs),length(years))
+for(i in 1:length(WBICs)){
+  for(j in 1:length(years)){
+    if(paste(WBICs[i],years[j],sep="_")%in%whatWeHave){
+      sampTable[i,j]=1
+    }
+  }
+}
+
+dotchart(rep(years[1],length(WBICs)),pt.cex=sampTable[,1]*0.5,labels=WBICs,xlab="year",ylab="WBIC",pch=16,xlim=c(min(years),max(years)),cex=0.5,lcolor='white',main="all")
+for(i in 2:length(years)){
+  points(rep(years[i],length(WBICs)),1:length(WBICs),cex=sampTable[,i]*0.5,pch=16)
+  
+}
+
+
+#walleye
+whatWeHaveW=paste(BWPJoin$WBIC[BWPJoin$species=="WALLEYE"],BWPJoin$surveyYear[BWPJoin$species=="WALLEYE"],sep="_")
+
+sampTableW=matrix(0,length(WBICs),length(years))
+for(i in 1:length(WBICs)){
+  for(j in 1:length(years)){
+    if(paste(WBICs[i],years[j],sep="_")%in%whatWeHaveW){
+      sampTableW[i,j]=1
+    }
+  }
+}
+
+dotchart(rep(years[1],length(WBICs)),pt.cex=sampTableW[,1]*0.5,labels=WBICs,xlab="year",ylab="WBIC",pch=16,xlim=c(min(years),max(years)),cex=0.5,lcolor='white',main="walleye")
+for(i in 2:length(years)){
+  points(rep(years[i],length(WBICs)),1:length(WBICs),cex=sampTableW[,i]*0.5,pch=16)
+  
+}
+
+#LMB
+whatWeHaveLMB=paste(BWPJoin$WBIC[BWPJoin$species=="LARGEMOUTH BASS"],BWPJoin$surveyYear[BWPJoin$species=="LARGEMOUTH BASS"],sep="_")
+
+sampTableLMB=matrix(0,length(WBICs),length(years))
+for(i in 1:length(WBICs)){
+  for(j in 1:length(years)){
+    if(paste(WBICs[i],years[j],sep="_")%in%whatWeHaveLMB){
+      sampTableLMB[i,j]=1
+    }
+  }
+}
+
+dotchart(rep(years[1],length(WBICs)),pt.cex=sampTableLMB[,1]*0.5,labels=WBICs,xlab="year",ylab="WBIC",pch=16,xlim=c(min(years),max(years)),cex=0.5,lcolor='white',main="largemouth bass")
+for(i in 2:length(years)){
+  points(rep(years[i],length(WBICs)),1:length(WBICs),cex=sampTableLMB[,i]*0.5,pch=16)
+  
+}
+
+
+#SMB
+whatWeHaveSMB=paste(BWPJoin$WBIC[BWPJoin$species=="SMALLMOUTH BASS"],BWPJoin$surveyYear[BWPJoin$species=="SMALLMOUTH BASS"],sep="_")
+
+sampTableSMB=matrix(0,length(WBICs),length(years))
+for(i in 1:length(WBICs)){
+  for(j in 1:length(years)){
+    if(paste(WBICs[i],years[j],sep="_")%in%whatWeHaveSMB){
+      sampTableSMB[i,j]=1
+    }
+  }
+}
+
+dotchart(rep(years[1],length(WBICs)),pt.cex=sampTableSMB[,1]*0.5,labels=WBICs,xlab="year",ylab="WBIC",pch=16,xlim=c(min(years),max(years)),cex=0.5,lcolor='white',main="smallmouth bass")
+for(i in 2:length(years)){
+  points(rep(years[i],length(WBICs)),1:length(WBICs),cex=sampTableSMB[,i]*0.5,pch=16)
+  
+}
+
+#BC
+whatWeHaveBC=paste(BWPJoin$WBIC[BWPJoin$species=="BLACK CRAPPIE"],BWPJoin$surveyYear[BWPJoin$species=="BLACK CRAPPIE"],sep="_")
+
+sampTableBC=matrix(0,length(WBICs),length(years))
+for(i in 1:length(WBICs)){
+  for(j in 1:length(years)){
+    if(paste(WBICs[i],years[j],sep="_")%in%whatWeHaveBC){
+      sampTableBC[i,j]=1
+    }
+  }
+}
+
+dotchart(rep(years[1],length(WBICs)),pt.cex=sampTableBC[,1]*0.5,labels=WBICs,xlab="year",ylab="WBIC",pch=16,xlim=c(min(years),max(years)),cex=0.5,lcolor='white',main="black crappie")
+for(i in 2:length(years)){
+  points(rep(years[i],length(WBICs)),1:length(WBICs),cex=sampTableBC[,i]*0.5,pch=16)
+  
+}
+
+
+#BG
+whatWeHaveBG=paste(BWPJoin$WBIC[BWPJoin$species=="BLUEGILL"],BWPJoin$surveyYear[BWPJoin$species=="BLUEGILL"],sep="_")
+
+sampTableBG=matrix(0,length(WBICs),length(years))
+for(i in 1:length(WBICs)){
+  for(j in 1:length(years)){
+    if(paste(WBICs[i],years[j],sep="_")%in%whatWeHaveBG){
+      sampTableBG[i,j]=1
+    }
+  }
+}
+
+dotchart(rep(years[1],length(WBICs)),pt.cex=sampTableBG[,1]*0.5,labels=WBICs,xlab="year",ylab="WBIC",pch=16,xlim=c(min(years),max(years)),cex=0.5,lcolor='white',main="bluegill")
+for(i in 2:length(years)){
+  points(rep(years[i],length(WBICs)),1:length(WBICs),cex=sampTableBG[,i]*0.5,pch=16)
+  
+}
+
+
+#YP
+whatWeHaveYP=paste(BWPJoin$WBIC[BWPJoin$species=="YELLOW PERCH"],BWPJoin$surveyYear[BWPJoin$species=="YELLOW PERCH"],sep="_")
+
+sampTableYP=matrix(0,length(WBICs),length(years))
+for(i in 1:length(WBICs)){
+  for(j in 1:length(years)){
+    if(paste(WBICs[i],years[j],sep="_")%in%whatWeHaveYP){
+      sampTableYP[i,j]=1
+    }
+  }
+}
+
+dotchart(rep(years[1],length(WBICs)),pt.cex=sampTableYP[,1]*0.5,labels=WBICs,xlab="year",ylab="WBIC",pch=16,xlim=c(min(years),max(years)),cex=0.5,lcolor='white',main="yellow perch")
+for(i in 2:length(years)){
+  points(rep(years[i],length(WBICs)),1:length(WBICs),cex=sampTableYP[,i]*0.5,pch=16)
+  
+}

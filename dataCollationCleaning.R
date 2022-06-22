@@ -17,7 +17,7 @@ creel2=gdriveURL("https://drive.google.com/open?id=1UYhbGH28WXjmi-4BzhfwO4KYwrBC
 creel=rbind(creel1,creel2)
 
 # reduce to columns we care about
-creel=creel[,c(1,3,6,12,18,25:26,30,36,38)]
+creel=creel[,c(1,3,6,12,18,25:26,30,36,37,38)]
 
 # calculate effort
 # add zeroes to times with only 2 or 3 digits
@@ -169,7 +169,7 @@ WallPE=full_join(WallPE,WallPE_2018)
 write.table(WallPE,"cleanedWDNRwalleyePE.csv",sep=",",row.names=FALSE)
 
 ##### bass
-source("~/Documents/Research/MFE/database/db/dbUtil.r")
+library(MFEUtilities)
 #change this path to where you stored the current database on your own computer
 dbdir="~/Documents/Research/MFE/database"
 db="MFEdb.db"
@@ -263,6 +263,7 @@ bassPEfinal=bassPE[-c(3,15),]
 
 li_final=li[li$lakeID%in%bassPEfinal$lakeID,]
 li_final=li_final[order(li_final$lakeID),]
+li_final$surfaceArea[3]=136 # from DNR website
 bassPEfinal=bassPEfinal[order(bassPEfinal$lakeID),]
 
 sum(li_final$lakeID==bassPEfinal$lakeID)
