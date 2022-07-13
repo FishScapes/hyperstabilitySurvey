@@ -302,6 +302,23 @@ sort(bbc)[25]   #0.74
 sort(bbc)[975]  #0.82
 hist(bbc)
 
+# plots with beta !=  for walleye
+cpueCheck_WDNR$log_efCPE=log(cpueCheck_WDNR$meanEF_CPEkm)
+cpueCheck_WDNR$log_Density=log(cpueCheck_WDNR$Density)
+cpueCheck_WDNR$log_densityShoreline=log(cpueCheck_WDNR$densityShoreline)
+densityFit<-lmer(log_efCPE~log_Density+(1|wbicFactor),data=cpueCheck_WDNR)
+shoreDensityFit<-lmer(log_efCPE~log_densityShoreline+(1|wbicFactor),data=cpueCheck_WDNR)
+
+summary(densityFit)
+plot(cpueCheck_WDNR$Density,cpueCheck_WDNR$meanEF_CPEkm,col='darkgrey',pch=16)
+predictDensity=log(seq(1,3500,length.out=1000))
+lines(exp(predictDensity),exp(-2.84088+0.86180*predictDensity),lwd=2)
+
+summary(shoreDensityFit)
+plot(cpueCheck_WDNR$densityShoreline,cpueCheck_WDNR$meanEF_CPEkm,col='darkgrey',pch=16)
+predictShoreDensity=log(seq(1,800,length.out=500))
+lines(exp(predictShoreDensity),exp(-0.92553+0.73874*predictShoreDensity),lwd=2)
+
 
 # bass
 simDens=matrix(NA,nrow(bassPEfinal),1000)
