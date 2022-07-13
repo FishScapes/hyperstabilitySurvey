@@ -666,3 +666,79 @@ for(i in 2:length(years)){
   points(rep(years[i],length(WBICs)),1:length(WBICs),cex=sampTableYP[,i]*0.5,pch=16)
   
 }
+
+
+
+
+###### estimating beta  for EF vs PE relationships
+
+# Walleye
+simDens=matrix(NA,nrow(cpueCheck_WDNR),1000)
+for(i in 1:nrow(simDens)){
+  simDens[i,]=rnorm(1000,log(cpueCheck_WDNR$densityShoreline[i]),0.1451)  # sd based WDNR walleye PEs
+}
+
+bmc=numeric(1000)
+for(i in 1:length(bmc)){
+  logX=simDens[,i]
+  logY=log(cpueCheck_WDNR$meanEF_CPEkm)
+  fit=lmer(logY~logX+(1|cpueCheck_WDNR$wbicFactor))
+  bmc[i]=fit@pp$delb[2]#coef(fit)[2]
+}
+
+logX=log(cpueCheck_WDNR$densityShoreline)
+logY=log(cpueCheck_WDNR$meanEF_CPEkm)
+bols=(lmer(logY~logX+(1|cpueCheck_WDNR$wbicFactor)))@pp$delb[2]
+
+bbc=bols+(bols-bmc)
+
+bols
+mean(bbc) #0.78
+median(bbc)
+sort(bbc)[25]   #0.74
+sort(bbc)[975]  #0.82
+hist(bbc)
+
+
+# bass
+simDens=matrix(NA,nrow(bassPEfinal),1000)
+for(i in 1:nrow(simDens)){
+  simDens[i,]=rnorm(1000,log(bassPEfinal$densityShoreline[i]),0.1451)  # sd based on WDNR walleye PEs
+}
+
+bmc=numeric(1000)
+for(i in 1:length(bmc)){
+  logX=simDens[,i]
+  logY=log(bassPEfinal$efCPE)
+  fit=lm(logY~logX)
+  bmc[i]=coef(fit)[2]
+}
+
+logX=log(bassPEfinal$densityShoreline)
+logY=log(bassPEfinal$efCPE)
+bols=coef(lm(logY~logX))[2]
+
+bbc=bols+(bols-bmc)
+
+bols
+mean(bbc)
+median(bbc)
+sort(bbc)[25]
+sort(bbc)[975]
+hist(bbc)
+
+
+
+####### how does hyperstable EF impact ability to detect angler hyperstability?
+x=runif(100,50,1000)
+efCPE=0.15*x^0.78   # beta from WDNR walleye data
+anglerBetas=seq(0.5,1.5,0.05)
+emergentBeta=numeric(length(anglerBetas))
+for(i in 1:length(emergentBeta)){
+  CPUE=0.02*x^anglerBetas[i]
+  fit=lm(log(CPUE)~log(efCPE))
+  emergentBeta[i]=coef(fit)[2]
+}
+
+plot(anglerBetas,emergentBeta,xlim=c(0.4,2),ylim=c(0.4,2),xlab="known beta angling", ylab="observed beta from angler-electrofishing CPUE")
+abline(a=0,b=1)

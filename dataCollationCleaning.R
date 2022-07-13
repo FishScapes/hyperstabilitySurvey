@@ -203,8 +203,13 @@ for(i in 1:length(lakes)){
 }
 
 names(efCPE)=lakes
+names(efCPEsd)=lakes
+names(efCPElog_sd)=lakes
+
 # remove SE and BA - no DNR-style  electrofishing
 efCPE=efCPE[!is.na(efCPE)]
+efCPEsd=efCPEsd[!is.na(efCPE)]
+efCPElog_sd=efCPElog_sd[!is.na(efCPE)]
 
 bassPE2018=read.csv("~/Documents/Research/Fishscapes/hyperstability/hsSurvey/fishscapes2018_peSum_20180914.csv",row.names=1)
 bassPE2019=read.csv("~/Documents/Research/Fishscapes/hyperstability/hsSurvey/2019PEs.csv")
@@ -269,5 +274,9 @@ bassPEfinal=bassPEfinal[order(bassPEfinal$lakeID),]
 sum(li_final$lakeID==bassPEfinal$lakeID)
 
 bassPEfinal$densityAreal=bassPEfinal$PE/(li_final$surfaceArea*10000/1e6) # km^2
+
+
+#### get SD for beta correction
+efCPE=efCPE[names(efCPE)%in%bassPEfinal$lakeID]
 
 write.table(bassPEfinal,"cleanedMFEbassPE.csv",row.names=FALSE,sep=",")

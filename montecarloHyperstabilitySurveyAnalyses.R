@@ -16,7 +16,7 @@ fsfs=fs[fs$projectID==37,]
 fsfsdnr=fsfs[fsfs$metadataID%in%c("FishscapesSurvey.0.5mile.20180606","FishscapesSurvey.1.5mile.20180607"),]
 fsfsdnrpe=fsfsdnr[fsfsdnr$lakeID%in%lakes,]
 
-# create vector to store average efCPE for each lake
+# create vector to store mean and sd of log efCPE for each lake
 efCPE=numeric(length(lakes))
 SDefCPE=numeric(length(lakes))
 for(i in 1:length(lakes)){
@@ -29,21 +29,26 @@ for(i in 1:length(lakes)){
     cur_efCPE[j]=sum(curFI$otu=="largemouth_bass")/as.numeric(cur$distanceShocked[j])
   }
   
-  SDefCPE[i]=sd(cur_efCPE)  
-  efCPE[i]=mean(cur_efCPE)
+  SDefCPE[i]=sd(log(cur_efCPE))
+  efCPE[i]=mean(log(cur_efCPE))
 }
 
 names(efCPE)=lakes
 names(SDefCPE)=lakes
-# remove SE and BA - no DNR-style  electrofishing
-SDefCPE=SDefCPE[!is.na(efCPE)]
-efCPE=efCPE[!is.na(efCPE)]
+# remove SE and BA - no DNR-style  electrofishing; WS only  caught bass on one  ef trip; WB only had  one EF sample
+SDefCPE=SDefCPE[is.finite(efCPE)]
+efCPE=efCPE[is.finite(efCPE)]
 
-mean(SDefCPE/efCPE,na.rm=TRUE)  #0.63
-range(SDefCPE/efCPE,na.rm=TRUE)
+efCPE=efCPE[is.finite(SDefCPE)]
+SDefCPE=SDefCPE[is.finite(SDefCPE)]
+
+plot(efCPE,SDefCPE) # no scaling with mean
+summary(lm(SDefCPE~efCPE))
+
+mean(SDefCPE)  # 0.57
 
 
-# doing corrections from Hansen et al. 2005
+# doing corrections from Hansen et al. 2005, but  using lognormal distribution (normal distribution of logged efCPE)
 
 cur=BWPJoin[BWPJoin$species=="LARGEMOUTH BASS",]
 cur=BWPJoin[BWPJoin$species=="SMALLMOUTH BASS",]
@@ -54,15 +59,13 @@ cur=BWPJoin[BWPJoin$species=="BLUEGILL",]
 
 simDens=matrix(NA,nrow(cur),1000)
 for(i in 1:nrow(simDens)){
-  simDens[i,]=rnorm(1000,cur$meanEF_CPEkm[i],cur$meanEF_CPEkm[i]*0.63)
-  #simDens[i,]=rnorm(1000,cur$meanEF_CPEkm[i],cur$meanEF_CPEkm[i]*0.75)
-  #simDens[i,]=rnorm(1000,cur$meanEF_CPEkm[i],cur$meanEF_CPEkm[i]*1)
+  simDens[i,]=rnorm(1000,log(cur$meanEF_CPEkm[i]),0.57)
 }
 
 bmc=numeric(1000)
 for(i in 1:length(bmc)){
-  logX=log(simDens[simDens[,i]>0,i])
-  logY=log(cur$meanCPUE[simDens[,i]>0])
+  logX=simDens[,i]
+  logY=log(cur$meanCPUE)
   fit=lm(logY~logX)
   bmc[i]=coef(fit)[2]
 }
@@ -85,9 +88,7 @@ library(lme4)
 
 simDens=matrix(NA,nrow(BWPJoin),1000)
 for(i in 1:nrow(simDens)){
-  simDens[i,]=rnorm(1000,BWPJoin$meanEF_CPEkm[i],BWPJoin$meanEF_CPEkm[i]*0.63)
-  #simDens[i,]=rnorm(1000,BWPJoin$meanEF_CPEkm[i],BWPJoin$meanEF_CPEkm[i]*0.75)
-  #simDens[i,]=rnorm(1000,BWPJoin$meanEF_CPEkm[i],BWPJoin$meanEF_CPEkm[i]*1)
+  simDens[i,]=rnorm(1000,log(BWPJoin$meanEF_CPEkm[i]),0.57)
 }
 
 BWP_species<-lmer(logCPUE~logAbun+species+logAbun:species+(1|WBICfactor),data=BWPJoin)
@@ -96,9 +97,9 @@ bols=c(params[2],params[2]+params[8:12])
 
 store=matrix(NA,1000,7)
 for(i in 1:nrow(store)){
-  logX=log(simDens[simDens[,i]>0,i])
-  logY=log(BWPJoin$meanCPUE[simDens[,i]>0])
-  toFit=data.frame(logX=logX,logY=logY,species=BWPJoin$species[simDens[,i]>0],WBICfactor=BWPJoin$WBICfactor[simDens[,i]>0])
+  logX=simDens[,i]
+  logY=log(BWPJoin$meanCPUE)
+  toFit=data.frame(logX=logX,logY=logY,species=BWPJoin$species,WBICfactor=BWPJoin$WBICfactor)
   curBWP_null<-lmer(logY~logX+species+(1|WBICfactor),data=toFit)
   curBWP_species<-lmer(logY~logX+species+logX:species+(1|WBICfactor),data=toFit)
   curLRT=anova(curBWP_null,curBWP_species)
@@ -122,20 +123,20 @@ colSums(store[,2:7]>1)
 
 
 
-#### habitat tests
-## BLACK CRAPPIE - a few warnings about convergence code 3 from bobyqa
+#### habitat tests 
+## BLACK CRAPPIE
 cur=BWPlc[BWPlc$species=="BLACK CRAPPIE",] # N = 66
 
 simDens=matrix(NA,nrow(cur),1000)
 for(i in 1:nrow(simDens)){
-  simDens[i,]=rnorm(1000,cur$meanEF_CPEkm[i],cur$meanEF_CPEkm[i]*0.63)
+  simDens[i,]=rnorm(1000,log(cur$meanEF_CPEkm[i]),0.57)
 }
 
 store=matrix(NA,1000,7)
 for(i in 1:nrow(store)){
-  logX=log(simDens[simDens[,i]>0,i])
-  logY=log(cur$meanCPUE[simDens[,i]>0])
-  toFit=data.frame(logX=logX,logY=logY,complex=cur$shorelineComplexity[simDens[,i]>0],area=cur$logLake[simDens[,i]>0],ripdev=cur$riparian_Developed[simDens[,i]>0],complex2=cur$ShoreComp2[simDens[,i]>0],area2=cur$LkArea2[simDens[,i]>0],ripdev2=cur$RipDev2[simDens[,i]>0],WBICfactor=cur$WBICfactor[simDens[,i]>0])
+  logX=simDens[,i]
+  logY=log(cur$meanCPUE)
+  toFit=data.frame(logX=logX,logY=logY,complex=cur$shorelineComplexity,area=cur$logLake,ripdev=cur$riparian_Developed,complex2=cur$ShoreComp2,area2=cur$LkArea2,ripdev2=cur$RipDev2,WBICfactor=cur$WBICfactor)
   
   ### fit six models and their nulls
   
@@ -189,19 +190,20 @@ BCstore=store
 apply(BCstore,2,median)
 colSums(BCstore>(0.05))/1000
 
-## BLUEGILL - couple of warnings about convergence code
+
+## BLUEGILL
 cur=BWPlc[BWPlc$species=="BLUEGILL",] # N = 89
 
 simDens=matrix(NA,nrow(cur),1000)
 for(i in 1:nrow(simDens)){
-  simDens[i,]=rnorm(1000,cur$meanEF_CPEkm[i],cur$meanEF_CPEkm[i]*0.63)
+  simDens[i,]=rnorm(1000,log(cur$meanEF_CPEkm[i]),0.57)
 }
 
 store=matrix(NA,1000,6)
 for(i in 1:nrow(store)){
-  logX=log(simDens[simDens[,i]>0,i])
-  logY=log(cur$meanCPUE[simDens[,i]>0])
-  toFit=data.frame(logX=logX,logY=logY,complex=cur$shorelineComplexity[simDens[,i]>0],area=cur$logLake[simDens[,i]>0],ripdev=cur$riparian_Developed[simDens[,i]>0],complex2=cur$ShoreComp2[simDens[,i]>0],area2=cur$LkArea2[simDens[,i]>0],ripdev2=cur$RipDev2[simDens[,i]>0],WBICfactor=cur$WBICfactor[simDens[,i]>0])
+  logX=simDens[,i]
+  logY=log(cur$meanCPUE)
+  toFit=data.frame(logX=logX,logY=logY,complex=cur$shorelineComplexity,area=cur$logLake,ripdev=cur$riparian_Developed,complex2=cur$ShoreComp2,area2=cur$LkArea2,ripdev2=cur$RipDev2,WBICfactor=cur$WBICfactor)
   
   ### fit six models and their nulls
   
@@ -251,19 +253,20 @@ BGstore=store
 apply(BGstore,2,median)
 colSums(BGstore>(0.05))/1000
 
+
 ## LARGEMOUTH BASS -  singular warnings...
 cur=BWPlc[BWPlc$species=="LARGEMOUTH BASS",] # N = 172
 
 simDens=matrix(NA,nrow(cur),1000)
 for(i in 1:nrow(simDens)){
-  simDens[i,]=rnorm(1000,cur$meanEF_CPEkm[i],cur$meanEF_CPEkm[i]*0.63)
+  simDens[i,]=rnorm(1000,log(cur$meanEF_CPEkm[i]),0.57)
 }
 
 store=matrix(NA,1000,6)
 for(i in 1:nrow(store)){
-  logX=log(simDens[simDens[,i]>0,i])
-  logY=log(cur$meanCPUE[simDens[,i]>0])
-  toFit=data.frame(logX=logX,logY=logY,complex=cur$shorelineComplexity[simDens[,i]>0],area=cur$logLake[simDens[,i]>0],ripdev=cur$riparian_Developed[simDens[,i]>0],complex2=cur$ShoreComp2[simDens[,i]>0],area2=cur$LkArea2[simDens[,i]>0],ripdev2=cur$RipDev2[simDens[,i]>0],WBICfactor=cur$WBICfactor[simDens[,i]>0])
+  logX=simDens[,i]
+  logY=log(cur$meanCPUE)
+  toFit=data.frame(logX=logX,logY=logY,complex=cur$shorelineComplexity,area=cur$logLake,ripdev=cur$riparian_Developed,complex2=cur$ShoreComp2,area2=cur$LkArea2,ripdev2=cur$RipDev2,WBICfactor=cur$WBICfactor)
   
   ### fit six models and their nulls
   
@@ -313,19 +316,20 @@ LMBstore=store
 apply(LMBstore,2,median)
 colSums(LMBstore>(0.05))/1000
 
+
 ## SMALLMOUTH BASS - no warnings, no errors
 cur=BWPlc[BWPlc$species=="SMALLMOUTH BASS",] # N = 155
 
 simDens=matrix(NA,nrow(cur),1000)
 for(i in 1:nrow(simDens)){
-  simDens[i,]=rnorm(1000,cur$meanEF_CPEkm[i],cur$meanEF_CPEkm[i]*0.63)
+  simDens[i,]=rnorm(1000,log(cur$meanEF_CPEkm[i]),0.57)
 }
 
 store=matrix(NA,1000,6)
 for(i in 1:nrow(store)){
-  logX=log(simDens[simDens[,i]>0,i])
-  logY=log(cur$meanCPUE[simDens[,i]>0])
-  toFit=data.frame(logX=logX,logY=logY,complex=cur$shorelineComplexity[simDens[,i]>0],area=cur$logLake[simDens[,i]>0],ripdev=cur$riparian_Developed[simDens[,i]>0],complex2=cur$ShoreComp2[simDens[,i]>0],area2=cur$LkArea2[simDens[,i]>0],ripdev2=cur$RipDev2[simDens[,i]>0],WBICfactor=cur$WBICfactor[simDens[,i]>0])
+  logX=simDens[,i]
+  logY=log(cur$meanCPUE)
+  toFit=data.frame(logX=logX,logY=logY,complex=cur$shorelineComplexity,area=cur$logLake,ripdev=cur$riparian_Developed,complex2=cur$ShoreComp2,area2=cur$LkArea2,ripdev2=cur$RipDev2,WBICfactor=cur$WBICfactor)
   
   ### fit six models and their nulls
   
@@ -375,19 +379,20 @@ SMBstore=store
 apply(SMBstore,2,median)
 colSums(SMBstore>(0.05))/1000
 
+
 ## WALLEYE - no warnings, no errors
 cur=BWPlc[BWPlc$species=="WALLEYE",] # N = 302
 
 simDens=matrix(NA,nrow(cur),1000)
 for(i in 1:nrow(simDens)){
-  simDens[i,]=rnorm(1000,cur$meanEF_CPEkm[i],cur$meanEF_CPEkm[i]*0.63)
+  simDens[i,]=rnorm(1000,log(cur$meanEF_CPEkm[i]),0.57)
 }
 
 store=matrix(NA,1000,6)
 for(i in 1:nrow(store)){
-  logX=log(simDens[simDens[,i]>0,i])
-  logY=log(cur$meanCPUE[simDens[,i]>0])
-  toFit=data.frame(logX=logX,logY=logY,complex=cur$shorelineComplexity[simDens[,i]>0],area=cur$logLake[simDens[,i]>0],ripdev=cur$riparian_Developed[simDens[,i]>0],complex2=cur$ShoreComp2[simDens[,i]>0],area2=cur$LkArea2[simDens[,i]>0],ripdev2=cur$RipDev2[simDens[,i]>0],WBICfactor=cur$WBICfactor[simDens[,i]>0])
+  logX=simDens[,i]
+  logY=log(cur$meanCPUE)
+  toFit=data.frame(logX=logX,logY=logY,complex=cur$shorelineComplexity,area=cur$logLake,ripdev=cur$riparian_Developed,complex2=cur$ShoreComp2,area2=cur$LkArea2,ripdev2=cur$RipDev2,WBICfactor=cur$WBICfactor)
   
   ### fit six models and their nulls
   
@@ -443,14 +448,14 @@ cur=BWPlc[BWPlc$species=="YELLOW PERCH",] # N = 88
 
 simDens=matrix(NA,nrow(cur),1000)
 for(i in 1:nrow(simDens)){
-  simDens[i,]=rnorm(1000,cur$meanEF_CPEkm[i],cur$meanEF_CPEkm[i]*0.63)
+  simDens[i,]=rnorm(1000,log(cur$meanEF_CPEkm[i]),0.57)
 }
 
 store=matrix(NA,1000,6)
 for(i in 1:nrow(store)){
-  logX=log(simDens[simDens[,i]>0,i])
-  logY=log(cur$meanCPUE[simDens[,i]>0])
-  toFit=data.frame(logX=logX,logY=logY,complex=cur$shorelineComplexity[simDens[,i]>0],area=cur$logLake[simDens[,i]>0],ripdev=cur$riparian_Developed[simDens[,i]>0],complex2=cur$ShoreComp2[simDens[,i]>0],area2=cur$LkArea2[simDens[,i]>0],ripdev2=cur$RipDev2[simDens[,i]>0],WBICfactor=cur$WBICfactor[simDens[,i]>0])
+  logX=simDens[,i]
+  logY=log(cur$meanCPUE)
+  toFit=data.frame(logX=logX,logY=logY,complex=cur$shorelineComplexity,area=cur$logLake,ripdev=cur$riparian_Developed,complex2=cur$ShoreComp2,area2=cur$LkArea2,ripdev2=cur$RipDev2,WBICfactor=cur$WBICfactor)
   
   ### fit six models and their nulls
   
@@ -500,6 +505,9 @@ YWPstore=store
 apply(YWPstore,2,median)
 colSums(YWPstore>(0.05))/1000
 
+
+
+#####*********** haven't redone below for revisions #3 yet...
 
 #make a box and whisker or violin plot of p-values for those worth talking about
 # BC ripdev1, BC ripdev2, LMB area2
@@ -583,9 +591,7 @@ library(lme4)
 
 simDens=matrix(NA,nrow(BWPJoin),1000)
 for(i in 1:nrow(simDens)){
-  simDens[i,]=rnorm(1000,BWPJoin$meanEF_CPEkm[i],BWPJoin$meanEF_CPEkm[i]*0.63)
-  #simDens[i,]=rnorm(1000,BWPJoin$meanEF_CPEkm[i],BWPJoin$meanEF_CPEkm[i]*0.75)
-  #simDens[i,]=rnorm(1000,BWPJoin$meanEF_CPEkm[i],BWPJoin$meanEF_CPEkm[i]*1)
+  simDens[i,]=rnorm(1000,BWPJoin$meanEF_CPEkm[i],0.57)
 }
 
 BWP_species<-lmer(logCPUE~logAbun+species+logAbun:species+(1|WBICfactor),data=BWPJoin)
