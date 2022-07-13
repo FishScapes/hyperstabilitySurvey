@@ -859,11 +859,40 @@ apply(YWPstore,2,median)
 colSums(YWPstore>(0.05))/1000
 
 #make a box and whisker or violin plot of p-values for those worth talking about
-# BC ripdev1, BC ripdev2, LMB area2
+#BC ripdev2, LMB area2
 
-boxplot(log10(c(BCstore[,1],BCstore[,2],BCstore[,7],LMBstore[,6]))~rep(c('BC - linear','BC - quadratic','BC lin. vs. quad.','LMB quadratic'),each=1000),xlab="",ylab="LRT p-value")
+boxplot(log10(c(BCstore[,2],LMBstore[,6]))~rep(c('BC - quadratic for riparian development','LMB quadratic for lake area'),each=1000),xlab="",ylab="LRT p-value")
 
 
+# looking at models that consistently outperformed the null model
+cur=BWPlc[BWPlc$species=="BLACK CRAPPIE",]
+toFit=data.frame(logX=log(cur$meanEF_CPEkm),logY=log(cur$meanCPUE),complex=cur$shorelineComplexity,area=cur$logLake,ripdev=cur$riparian_Developed,complex2=cur$ShoreComp2,area2=cur$LkArea2,ripdev2=cur$RipDev2,WBICfactor=cur$WBICfactor)
+BCripdev2<-lmer(logY~logX+ripdev+ripdev2+ripdev:logX+ripdev2:logX+(1|WBICfactor),data=toFit)
+summary(BCripdev2)
+
+a=20.0861 # quadratic interaction with abund
+b=-3.7379 # linear interaction with abun
+c=0.2368 #just abun effect
+x=seq(0,0.4,0.01)
+
+plot(x,a*x*x+b*x+c,type="l",xlab="riparian developed",ylab="beta", main="crappie riparian development effect")
+-b/(2*a) # x coordinate of vertex
+
+
+
+cur=BWPlc[BWPlc$species=="LARGEMOUTH BASS",]
+toFit=data.frame(logX=log(cur$meanEF_CPEkm),logY=log(cur$meanCPUE),complex=cur$shorelineComplexity,area=cur$logLake,ripdev=cur$riparian_Developed,complex2=cur$ShoreComp2,area2=cur$LkArea2,ripdev2=cur$RipDev2,WBICfactor=cur$WBICfactor)
+LMBarea2<-lmer(logY~logX+area+area2+area:logX+area2:logX+(1|WBICfactor),data=toFit)
+summary(LMBarea2)
+
+a=-0.29336  #quadratic interaction with abund
+b=3.91775 # linear interaction with abun
+c=-12.60165 #just abun effect
+x=seq(2,8,0.1)
+
+plot(x,a*x*x+b*x+c,type="l",xlab="log lake area",ylab="beta", main="LMB - lake area affect")
+     
+10^(-b/(2*a))/1e6 # x coordinate of vertex in km^2
 
 
 ######################################################################
